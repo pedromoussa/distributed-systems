@@ -1,6 +1,6 @@
 import socket
 #import select
-#import sys
+import sys
 import threading
 import json
 import os
@@ -12,7 +12,7 @@ PORT = 10000
 #lista de I/O de interesse
 '''
 foi removida pois o sys.stdin nao funcionava corretamente no windows
-entao optei por utilizar apenas as threads
+junto ao select, entao optei por utilizar apenas as threads
 '''
 #entradas = []
 
@@ -85,7 +85,33 @@ def atendeRequisicoes(cliSock, endr):
 
                 lock.release()
 
-                cliSock.close() 
+                cliSock.close()
+
+                if not conexoes:
+
+                    for sock in conexoes.keys():
+                        sock.close()
+
+                    print('Não há mais conexões ativas com clientes. Deseja encerrar o servidor? (Y/N)')
+
+                    while True:
+                        
+                        cli = sys.stdin.readline().strip()
+
+                        match cli:
+
+                            case 'Y':
+
+                                os._exit(0)
+
+                            case 'N':
+
+                                print('Arguardando novas conexoes...')
+                                break
+
+                            case _:
+
+                                print('Digite Y para encerrar e N para continuar aguardando') 
 
                 return
             
