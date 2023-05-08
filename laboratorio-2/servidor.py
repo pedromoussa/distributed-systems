@@ -1,15 +1,20 @@
 import socket
-import select
-import sys
+#import select
+#import sys
 import threading
 import json
+import os
 
 #localizacao do servidor
 HOST = ''
 PORT = 10000
 
 #lista de I/O de interesse
-entradas = [sys.stdin]
+'''
+foi removida pois o sys.stdin nao funcionava corretamente no windows
+entao optei por utilizar apenas as threads
+'''
+#entradas = []
 
 #conexoes ativas
 conexoes = {}
@@ -33,8 +38,6 @@ def iniciaServidor():
     sock.listen(5)
 
     sock.setblocking(False)
-
-    entradas.append(sock)
 
     return sock
 
@@ -64,56 +67,108 @@ Entrada: socket da conexao e endereco do cliente
 
 Saida: 
 '''
-def atendeRequesicoes(cliSock, endr):
+def atendeRequisicoes(cliSock, endr):
 
     while True:
 
-        data = cliSock.recv(1024)
+        try:
 
-        if not data: 
+            requisicao = recebeEntrada(cliSock)
 
-            print(str(endr) + '-> encerrou')
+            if not requisicao:
 
-            lock.acquire()
+                print(str(endr) + '-> encerrou')
 
-            del conexoes[cliSock]
+                lock.acquire()
 
-            lock.release()
+                del conexoes[cliSock]
 
-            entradas.remove(cliSock)
+                lock.release()
 
-            cliSock.close() 
+                cliSock.close() 
 
-            return
+                return
+            
+            elif requisicao == 'consulta':
 
-        elif str(data, encoding='utf-8') == 'consulta':
+                cliSock.send('Digite o item que deseja consultar: '.encode())
 
-            chave = input('Digite o item que deseja consultar:').lower()
+                chave = recebeEntrada(cliSock).lower()
 
-            valor = consultaDicionario(chave)
+                valor = consultaDicionario(chave)
 
-            print(valor)
+                cliSock.send(valor.encode())
 
-        elif str(data, encoding='utf-8') == 'inserir':
+            elif requisicao == 'inserir':
 
-            chave = input('Digite o item que deseja adicionar ao dicionario:').lower()
+                cliSock.send('Digite o item que deseja adicionar ao dicionario: '.encode())
 
-            valor = input('Digite seu significado:').lower()
+                chave = recebeEntrada(cliSock).lower()
 
-            insereDicionario(chave, valor)
+                cliSock.send('Digite seu significado: '.encode())
 
-        elif str(data, encoding='utf-8') == 'remover':
+                valor = recebeEntrada(cliSock).lower()
 
-            chave = input('Digite o item que deseja remover:').lower()
+                resposta = insereDicionario(chave, valor)
 
-            removeDicionario(chave)
+                cliSock.send(resposta.encode())
 
-        else:
+            elif requisicao == 'remover':
 
-            print(str(data, encoding='utf-8') + ': nao e um comando reconhecido')
-            print('Os comandos reconhecidos sao: consulta, inserir e remover')
+                cliSock.send('Digite o item que deseja remover:'.encode())
 
-        cliSock.send(data)
+                chave = recebeEntrada(cliSock).lower()
+
+                resposta = removeDicionario(chave)
+
+                cliSock.send(resposta.encode())
+
+            else:
+
+                cliSock.send('Comando nao reconhecido\nOs comandos reconhecidos sao: consulta, inserir e remover'.encode())
+
+        except BlockingIOError: pass
+
+        except socket.error as err: print('Erro de socket: ', err)
+
+'''
+Recebe a entrada digitada pelo usuario para realizar
+as operacoes no dicionario
+
+Entrada: socket
+
+Saida: string digitada pelo usuario ou mensagem de erro
+'''
+def recebeEntrada(sock):
+
+    size = 1024
+    entrada = b''
+
+    while True:
+
+        try:
+
+            data = sock.recv(size - len(entrada))
+
+            if not data:
+
+                return None
+            
+            entrada += data
+
+            if b'\n' in entrada:
+
+                break
+
+        except BlockingIOError:
+
+            pass
+
+        except socket.error as err:
+
+            print('Erro de socket: ', err)
+
+    return entrada.decode().strip()
 
 '''
 Consulta dicionario em busca do valor de um item
@@ -128,7 +183,13 @@ def consultaDicionario(chave):
 
     with open('dicionario.json', 'r') as arquivo:
 
-        dicionario = json.load(arquivo)
+        if os.stat('dicionario.json').st_size ==0:
+
+            dicionario = {}
+
+        else:
+
+            dicionario = json.load(arquivo)
 
     lock.release()
 
@@ -139,13 +200,22 @@ Insere um item no dicionario
 
 Entrada: chave e valor do item
 
-Saida: 
+Saida: confirmacao de sucesso da operacao
 '''
 def insereDicionario(chave, valor):
 
+    lock.acquire()
+
     with open('dicionario.json', 'r+') as arquivo:
 
-        dicionario = json.load(arquivo)
+        if os.stat('dicionario.json').st_size ==0:
+
+            dicionario = {}
+
+        else:
+
+            dicionario = json.load(arquivo)
+
         dicionario[chave] = valor
 
         arquivo.seek(0)
@@ -154,22 +224,32 @@ def insereDicionario(chave, valor):
 
         arquivo.truncate()
 
-        print('Item adicionado com sucesso')
+        resposta = 'Item adicionado com sucesso'
 
     lock.release()
+
+    return resposta
 
 '''
 Remove um item do dicionario
 
 Entrada: chave de um item do dicionario
 
-Saida: 
+Saida: confirmacao de sucesso da operacao
 '''
 def removeDicionario(chave):
 
+    lock.acquire()
+
     with open('dicionario.json', 'r+') as arquivo:
 
-        dicionario = json.load(arquivo)
+        if os.stat('dicionario.json').st_size ==0:
+
+            dicionario = {}
+
+        else:
+
+            dicionario = json.load(arquivo)
 
         if chave in dicionario:
 
@@ -177,11 +257,13 @@ def removeDicionario(chave):
 
             json.dump(dicionario, arquivo)
 
-            print('Item removido com sucesso')
+            resposta = ('Item removido com sucesso')
 
-        else: print('A chave {chave} nao existe no dicionario')
+        else: resposta = 'A chave {chave} nao existe no dicionario'
 
     lock.release()
+
+    return resposta
 
 '''
 Inicializa e implementa o loop principal do servidor
@@ -196,50 +278,22 @@ def main():
     print('Pronto para receber conexões...')
 
     while True:
+        
+        try:
 
-        leitura, escrita, excecao = select.select(entradas, [], [])
+            cliSock, endr = aceitaConexao(sock)
+            print('Conectado com: ', endr)
+            cliente = threading.Thread(target=atendeRequisicoes, args=(cliSock, endr))
+            cliente.start()
+            clientes.append(cliente)
+            cliSock.setblocking(False)
 
-        for pronto in leitura:
+        except BlockingIOError:
 
-            if pronto == sock:
+            pass
 
-                cliSock, endr = aceitaConexao(sock)
+        except socket.error as err:
 
-                print('Conectado com: ', endr)
-
-                cliente = threading.Thread(target=atendeRequesicoes, args=(cliSock, endr))
-                cliente.start()
-                clientes.append(cliente)
-
-                cliSock.setblocking(False)
-
-                entradas.append(cliSock)
-
-            elif pronto == sys.stdin:
-
-                cmd = input().lower()
-
-                if cmd == 'fim':
-                    
-                    #aguarda fim das threads para fechar o servidor
-                    for c in clientes:
-                        c.join()
-
-                    sock.close()
-                    sys.exit()
-
-                elif cmd == 'hist':
-
-                    print(str(conexoes.values()))
-
-                elif cmd == 'remover':
-
-                    chave = input('Chave: ')
-
-                    removeDicionario(chave)
-
-            else:
-                
-                atendeRequesicoes(pronto, conexoes[pronto])
+            print('Erro de socket: ', err)              
 
 main()

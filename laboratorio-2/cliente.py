@@ -25,32 +25,37 @@ def main():
 
     sock = iniciaConexao()
 
+    print('Digite "ajuda" para obter instrucoes')
+
     while True:
 
         requisicao = input('-- ')
 
-        print('Digite "ajuda" para obter instrucoes')
-
         match requisicao:
 
-            case '1':
+            case 'Operacoes':
 
                 print('As operacoes permitidas sao: consulta e insercao')
                 print('Para realizar a consulta, digite "consulta"')
-                print('Para realizar a insercao, digite "insercao"')
+                print('Para realizar a insercao, digite "inserir"')
 
-            case '2':
+            case 'Fim':
 
                 print('A conexão foi encerrada')
+                sock.send('fim'.encode())
                 sock.close()
+                return
 
             case 'ajuda':
 
-                print('Digite 1 para exibir as operacoes')
-                print('Digite 2 para encerrar a conexao')
+                print('Digite "Operacoes" para exibir as operacoes')
+                print('Digite "Fim" para encerrar a conexao')
 
             case _:
 
+                requisicao = requisicao.strip() + '\n'
                 sock.send(requisicao.encode())
+                resposta = sock.recv(1024)
+                print(str(resposta, encoding='utf-8'))
 
 main()
