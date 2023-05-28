@@ -52,7 +52,7 @@ O código possui implementada a operação de remover um item do dicionário, ma
 
 Quando todas conexões forem fechadas, será possível encerrar o servidor pela linha de comando, ou optar por aguardar uma nova conexão.
 
-O limite de tamanha das mensagens ficou decidido em apenas 1024, já que o objetivo era aprender sobre a forma de comunicação e realização das operações cliente-servidor de forma concorrente, de modo que não é relevante o tamanha da mensagem do cliente.
+O limite de tamanho das mensagens ficou decidido em apenas 1024, já que o objetivo era aprender sobre a forma de comunicação e realização das operações cliente-servidor de forma concorrente, de modo que não é relevante o tamanho da mensagem do cliente.
 
-Foram utilizados alguns blocos try-catch devido a alguns erros que apareceram durante a execução, decorrentes das chamadas não serem bloqueantes. Novamente, relacionado ao Windows.
+Foram utilizados blocos try-catch devido a alguns erros que apareceram durante a execução, decorrentes das chamadas não serem bloqueantes. Novamente, relacionado ao Windows.
 
